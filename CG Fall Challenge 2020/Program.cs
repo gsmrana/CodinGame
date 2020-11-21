@@ -147,26 +147,26 @@ class Player
             }
         }
 
-        bool CanExpenseFromInventory(List<int> cost)
+        static bool CanCastToInventory(List<int> cost, List<int> inventory)
         {
-            if (MyInventory.Sum() + cost.Sum() < 0)
+            var totalcount = inventory.Sum() + cost.Sum();
+
+            if (totalcount <= 0)
                 return false;
 
-            for (int i = 0; i < MyInventory.Count; i++)
+            if (totalcount > 10)
+                return false;
+
+            for (int i = 0; i < inventory.Count; i++)
             {
-                if (MyInventory[i] + cost[i] < 0)
+                if (inventory[i] + cost[i] < 0)
                     return false;
             }
 
             return true;
         }
 
-        bool CanAppendToInventory(List<int> cost)
-        {
-            return MyInventory.Sum() + cost.Sum() <= 10;
-        }
-
-        int GetWeightedCost(List<int> cost)
+        static int GetWeightedCost(List<int> cost)
         {
             int sum = 0;
             for (int i = 0; i < cost.Count; i++)
@@ -176,16 +176,16 @@ class Player
             return sum;
         }
 
-        Order GetWeightedBestProfitOrder()
+        static Order GetWeightedBestProfitOrder(List<Order> orders, List<int> inventory)
         {
             var bestorder = new Order();
             var maxprofit = -9999;
-            foreach (var order in OrderList)
+            foreach (var order in orders)
             {
                 int weightedprofit = order.Price;
                 for (int i = 0; i < order.Cost.Count; i++)
                 {
-                    weightedprofit += ((i + 1) * (MyInventory[i] + order.Cost[i]));
+                    weightedprofit += ((i + 1) * (inventory[i] + order.Cost[i]));
                 }
 
                 if (weightedprofit > maxprofit)
@@ -197,31 +197,62 @@ class Player
             return bestorder;
         }
 
-        IEnumerable<string> GetStepsToBrewOrder(Order order)
+        public static void RotateRight(IList sequence, int count)
         {
-            var netcost = new int[4];
-            for (int i = 0; i < order.Cost.Count; i++)
+            object tmp = sequence[count - 1];
+            sequence.RemoveAt(count - 1);
+            sequence.Insert(0, tmp);
+        }
+
+        public static IEnumerable<IList> Permutate(IList sequence, int count)
+        {
+            if (count == 1) yield return sequence;
+            else
             {
-                netcost[i] += MyInventory[i] + order.Cost[i];
+                for (int i = 0; i < count; i++)
+                {
+                    foreach (var perm in Permutate(sequence, count - 1))
+                        yield return perm;
+                    RotateRight(sequence, count);
+                }
             }
+        }
 
+        static IEnumerable<string> GetShortestPathBrewSteps(List<Order> myorders, List<Spell> myspells, List<int> myinventory)
+        {
             var steps = new List<string>();
-            for (int i = 0; i < netcost.Length; i++)
-            {
-                if (netcost[i] >= 0)
-                    continue;
+            var spells = new List<Spell>(myspells);
+            var inv = new List<int>(myinventory);
 
-                //ToDo: need to implement
+            foreach (var permu in Permutate(spells, spells.Count))
+            {
+                foreach (Spell spell in permu)
+                {
+                    if (CanCastToInventory(spell.Cost, inv))
+                    {
+                        //cast the spell
+                        for (int i = 0; i < inv.Count; i++)
+                            inv[i] += spell.Cost[i];
+                        steps.Add("CAST " + spell.Id);
+                    }
+
+                    var id = -1;
+                    if (CanBrewFromInventory(ref id, myorders, inv))
+                    {
+                        //push the step
+                        steps.Add("BREW " + id);
+                    }
+                }
             }
 
             return steps;
         }
 
-        bool CanBrewFromInventory(ref int brewid)
+        static bool CanBrewFromInventory(ref int brewid, List<Order> orders, List<int> inventory)
         {
-            foreach (var order in OrderList)
+            foreach (var order in orders)
             {
-                if (CanExpenseFromInventory(order.Cost))
+                if (CanCastToInventory(order.Cost, inventory))
                 {
                     brewid = order.Id;
                     return true;
@@ -230,29 +261,28 @@ class Player
             return false;
         }
 
-        bool CanCastFromSpells(ref int spellid)
+        static bool CanIncreaseTheSmallestItem(ref int spellid, List<Spell> spells, List<int> inventory)
         {
             int smallest_index = 0;
             int smallest_count = 99;
 
-            for (int i = 0; i < MyInventory.Count; i++)
+            for (int i = 0; i < inventory.Count; i++)
             {
-                if (MyInventory[i] < smallest_count)
+                if (inventory[i] < smallest_count)
                 {
-                    smallest_count = MyInventory[i];
+                    smallest_count = inventory[i];
                     smallest_index = i;
                 }
             }
 
-            foreach (var spell in MySpells)
+            foreach (var spell in spells)
             {
                 if (!spell.Castable)
                     continue;
 
                 if (spell.Cost[smallest_index] > 0) // try increse minimum
                 {
-                    if (CanExpenseFromInventory(spell.Cost) &&
-                        CanAppendToInventory(spell.Cost))
+                    if (CanCastToInventory(spell.Cost, inventory))
                     {
                         spellid = spell.Id;
                         return true;
@@ -260,19 +290,6 @@ class Player
                 }
             }
 
-            return false;
-        }
-
-        bool CanLearnFromTome(ref int learnid)
-        {
-            foreach (var learn in MyLearns)
-            {
-                if (CanExpenseFromInventory(learn.Cost))
-                {
-                    learnid = learn.Id;
-                    return true;
-                }
-            }
             return false;
         }
 
@@ -286,7 +303,7 @@ class Player
             var id = -1;
             string action;
 
-            if (CanBrewFromInventory(ref id))
+            if (CanBrewFromInventory(ref id, OrderList, MyInventory))
             {
                 action = "BREW " + id;
                 learncount = 0;
@@ -297,7 +314,7 @@ class Player
                 action = "LEARN " + id;
                 learncount++;
             }
-            else if (CanCastFromSpells(ref id))
+            else if (CanIncreaseTheSmallestItem(ref id, MySpells, MyInventory))
             {
                 action = "CAST " + id;
                 needrest = true;
