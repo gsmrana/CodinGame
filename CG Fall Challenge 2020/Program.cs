@@ -9,9 +9,22 @@ class Player
     struct Spell
     {
         public int Id;
-        public bool Castable;
-        public bool Repeatable;
+        public bool IsCastable;
+        public bool IsRepeatable;
         public List<int> Cost;
+
+        public int WeightedValue
+        {
+            get
+            {
+                int sum = 0;
+                for (int i = 0; i < Cost.Count; i++)
+                {
+                    sum += ((i + 1) * Cost[i]);
+                }
+                return sum;
+            }
+        }
     }
 
     struct Learn
@@ -20,6 +33,19 @@ class Player
         public int TomeIndex;
         public int TaxCount;
         public List<int> Cost;
+
+        public int WeightedValue
+        {
+            get
+            {
+                int sum = 0;
+                for (int i = 0; i < Cost.Count; i++)
+                {
+                    sum += ((i + 1) * Cost[i]);
+                }
+                return sum;
+            }
+        }
     }
 
     struct Order
@@ -29,6 +55,16 @@ class Player
         public int Bonus;
         public int BonusTimes;
         public List<int> Cost;
+
+        public int WeightedProfit(List<int> inventory)
+        {
+            int wprofit = Price + Bonus;
+            for (int i = 0; i < Cost.Count; i++)
+            {
+                wprofit += ((i + 1) * (inventory[i] + Cost[i]));
+            }
+            return wprofit;
+        }
     }
 
     class GameState
@@ -71,7 +107,11 @@ class Player
         {
             string[] inputs;
             var line = ReadLine();
-            if (line.StartsWith("Standard")) line = ReadLine();
+            if (line.StartsWith("Standard"))
+            {
+                InputLineSkipEnable = true;
+                line = ReadLine();
+            }
             gs.DebugRawData(line);
 
             int actionCount = int.Parse(line); // the number of spells and recipes in play
@@ -105,8 +145,8 @@ class Player
                     gs.MySpells.Add(new Spell
                     {
                         Id = actionId,
-                        Castable = castable,
-                        Repeatable = repeatable,
+                        IsCastable = castable,
+                        IsRepeatable = repeatable,
                         Cost = new List<int> { delta0, delta1, delta2, delta3 }
                     });
                 else if (actionType == "LEARN")
@@ -277,7 +317,7 @@ class Player
 
             foreach (var spell in spells)
             {
-                if (!spell.Castable)
+                if (!spell.IsCastable)
                     continue;
 
                 if (spell.Cost[smallest_index] > 0) // try increse minimum
@@ -293,15 +333,17 @@ class Player
             return false;
         }
 
-        bool needrest;
         int learncount;
-        int turn_count;
+        //int turn_count;
 
         public string ExecuteGameLogic()
         {
-            turn_count++;
+            //turn_count++;
             var id = -1;
             string action;
+
+            MySpells = MySpells.OrderByDescending(s => s.WeightedValue).ToList();
+            OrderList = OrderList.OrderByDescending(s => s.WeightedProfit(MyInventory)).ToList();
 
             if (CanBrewFromInventory(ref id, OrderList, MyInventory))
             {
@@ -317,16 +359,10 @@ class Player
             else if (CanIncreaseTheSmallestItem(ref id, MySpells, MyInventory))
             {
                 action = "CAST " + id;
-                needrest = true;
-            }
-            else if (needrest)
-            {
-                action = "REST";
-                needrest = false;
             }
             else
             {
-                action = "WAIT";
+                action = "REST";
             }
 
             return action;
@@ -339,7 +375,6 @@ class Player
     {
         gs = new GameState();
         //gs.InputPrintEnable = true;
-        //gs.InputLineSkipEnable = true;
 
         while (true)
         {
