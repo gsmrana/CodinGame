@@ -333,12 +333,8 @@ class Player
             return false;
         }
 
-        int learncount;
-        //int turn_count;
-
         public string ExecuteGameLogic()
         {
-            //turn_count++;
             var id = -1;
             string action;
 
@@ -348,13 +344,11 @@ class Player
             if (CanBrewFromInventory(ref id, OrderList, MyInventory))
             {
                 action = "BREW " + id;
-                learncount = 0;
             }
-            else if (learncount < 3 && MyLearns.Count > 0)
+            else if (MySpells.Count < 12 && MyLearns.Count > 0)
             {
                 id = MyLearns.FirstOrDefault().Id;
                 action = "LEARN " + id;
-                learncount++;
             }
             else if (CanIncreaseTheSmallestItem(ref id, MySpells, MyInventory))
             {
