@@ -42,6 +42,13 @@ class Game
             .FirstOrDefault();
         if (action != null) return action;
 
+        action = PossibleActions
+            .Where(a => a.Type == Action.SEED)
+            .OrderBy(a => a.SourceCellIdx)
+            .OrderBy(a => a.TargetCellIdx)
+            .FirstOrDefault();
+        if (action != null) return action;
+
         return new Action(Action.WAIT);
     }
 }
