@@ -3,6 +3,49 @@ using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 
+class Game
+{
+    public int Day { get; set; }
+    public int Nutrients { get; set; }
+    public int MySun { get; set; }
+    public int MyScore { get; set; }
+    public int OpponentSun { get; set; }
+    public int OpponentScore { get; set; }
+    public bool IsOpponentWaiting { get; set; }
+
+    public List<Cell> Board { get; set; }
+    public List<Tree> Trees { get; set; }
+    public List<Action> PossibleActions { get; set; }
+
+    public bool InputDataLogEnable { get; set; }
+    public bool ExtraInputLineSkipEnable { get; set; }
+
+    public Game()
+    {
+        Board = new List<Cell>();
+        Trees = new List<Tree>();
+        PossibleActions = new List<Action>();
+    }
+
+    public Action GetNextAction()
+    {
+        // ToDo : AI algorithm starts from here
+        var action = PossibleActions
+            .Where(a => a.Type == Action.COMPLETE)
+            .OrderBy(a => a.TargetCellIdx)
+            .FirstOrDefault();
+        if (action != null) return action;
+
+        action = PossibleActions
+            .Where(a => a.Type == Action.GROW)
+            .OrderBy(a => a.TargetCellIdx)
+            .FirstOrDefault();
+        if (action != null) return action;
+
+        return new Action(Action.WAIT);
+    }
+}
+
 class Cell
 {
     public int Index { get; set; }
@@ -85,48 +128,6 @@ class Action
     }
 }
 
-class Game
-{
-    public int Day { get; set; }
-    public int Nutrients { get; set; }
-    public int MySun { get; set; }
-    public int MyScore { get; set; }
-    public int OpponentSun { get; set; }
-    public int OpponentScore { get; set; }
-    public bool OpponentIsWaiting { get; set; }
-
-    public List<Cell> Board { get; set; }
-    public List<Tree> Trees { get; set; }
-    public List<Action> PossibleActions { get; set; }
-
-    public bool InputDataLogEnable { get; set; }
-    public bool ExtraInputLineSkipEnable { get; set; }
-
-    public Game()
-    {
-        Board = new List<Cell>();
-        Trees = new List<Tree>();
-        PossibleActions = new List<Action>();
-    }
-
-    public Action GetNextAction()
-    {
-        // ToDo : AI algorithm starts from here
-        var nextAction = new Action(Action.WAIT);
-
-        var action = PossibleActions
-            .Where(a => a.Type == Action.COMPLETE)
-            .OrderBy(a => a.TargetCellIdx)
-            .FirstOrDefault();
-
-        if (action != null)
-        {
-            nextAction = action;
-        }
-
-        return nextAction;
-    }
-}
 
 class Player
 {
@@ -194,7 +195,7 @@ class Player
             inputs = ConsoleReadLine().Split(' ');
             game.OpponentSun = int.Parse(inputs[0]); // opponent's sun points
             game.OpponentScore = int.Parse(inputs[1]); // opponent's score
-            game.OpponentIsWaiting = inputs[2] != "0"; // whether your opponent is asleep until the next day
+            game.IsOpponentWaiting = inputs[2] != "0"; // whether your opponent is asleep until the next day
 
             game.Trees.Clear();
             int numberOfTrees = int.Parse(ConsoleReadLine()); // the current amount of trees
