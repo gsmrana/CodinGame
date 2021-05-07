@@ -5,31 +5,31 @@ using System.Collections.Generic;
 
 class Cell
 {
-    public int index;
-    public int richness;
-    public int[] neighbours;
+    public int Index { get; set; }
+    public int Richness { get; set; }
+    public int[] Neighbours { get; set; }
 
     public Cell(int index, int richness, int[] neighbours)
     {
-        this.index = index;
-        this.richness = richness;
-        this.neighbours = neighbours;
+        Index = index;
+        Richness = richness;
+        Neighbours = neighbours;
     }
 }
 
 class Tree
 {
-    public int cellIndex;
-    public int size;
-    public bool isMine;
-    public bool isDormant;
+    public int CellIndex { get; set; }
+    public int Size { get; set; }
+    public bool IsMine { get; set; }
+    public bool IsDormant { get; set; }
 
     public Tree(int cellIndex, int size, bool isMine, bool isDormant)
     {
-        this.cellIndex = cellIndex;
-        this.size = size;
-        this.isMine = isMine;
-        this.isDormant = isDormant;
+        CellIndex = cellIndex;
+        Size = size;
+        IsMine = isMine;
+        IsDormant = isDormant;
     }
 }
 
@@ -56,15 +56,15 @@ class Action
         }
     }
 
-    public string type;
-    public int targetCellIdx;
-    public int sourceCellIdx;
+    public string Type { get; set; }
+    public int TargetCellIdx { get; set; }
+    public int SourceCellIdx { get; set; }
 
     public Action(string type, int sourceCellIdx, int targetCellIdx)
     {
-        this.type = type;
-        this.targetCellIdx = targetCellIdx;
-        this.sourceCellIdx = sourceCellIdx;
+        this.Type = type;
+        this.TargetCellIdx = targetCellIdx;
+        this.SourceCellIdx = sourceCellIdx;
     }
 
     public Action(string type, int targetCellIdx)
@@ -79,25 +79,21 @@ class Action
 
     public override string ToString()
     {
-        if (type == WAIT)
-        {
-            return Action.WAIT;
-        }
-        if (type == SEED)
-        {
-            return string.Format("{0} {1} {2}", SEED, sourceCellIdx, targetCellIdx);
-        }
-        return string.Format("{0} {1}", type, targetCellIdx);
+        if (Type == WAIT) return Action.WAIT;
+        if (Type == SEED) return string.Format("{0} {1} {2}", SEED, SourceCellIdx, TargetCellIdx);
+        return string.Format("{0} {1}", Type, TargetCellIdx);
     }
 }
 
 class Game
 {
-    public int day;
-    public int nutrients;
-    public bool opponentIsWaiting;
-    public int mySun, opponentSun;
-    public int myScore, opponentScore;
+    public int Day { get; set; }
+    public int Nutrients { get; set; }
+    public int MySun { get; set; }
+    public int MyScore { get; set; }
+    public int OpponentSun { get; set; }
+    public int OpponentScore { get; set; }
+    public bool OpponentIsWaiting { get; set; }
 
     public List<Cell> Board { get; set; }
     public List<Tree> Trees { get; set; }
@@ -115,8 +111,20 @@ class Game
 
     public Action GetNextAction()
     {
-        // TODO: write your algorithm here
-        return PossibleActions.First();
+        // ToDo : AI algorithm starts from here
+        var nextAction = new Action(Action.WAIT);
+
+        var action = PossibleActions
+            .Where(a => a.Type == Action.COMPLETE)
+            .OrderBy(a => a.TargetCellIdx)
+            .FirstOrDefault();
+
+        if (action != null)
+        {
+            nextAction = action;
+        }
+
+        return nextAction;
     }
 }
 
@@ -178,15 +186,15 @@ class Player
         while (true)
         {
             IgnoreExtraLines();
-            game.day = int.Parse(SkipExtraLogLines(ConsoleReadLine())); // the game lasts 24 days: 0-23
-            game.nutrients = int.Parse(ConsoleReadLine()); // the base score you gain from the next COMPLETE action
+            game.Day = int.Parse(SkipExtraLogLines(ConsoleReadLine())); // the game lasts 24 days: 0-23
+            game.Nutrients = int.Parse(ConsoleReadLine()); // the base score you gain from the next COMPLETE action
             inputs = ConsoleReadLine().Split(' ');
-            game.mySun = int.Parse(inputs[0]); // your sun points
-            game.myScore = int.Parse(inputs[1]); // your current score
+            game.MySun = int.Parse(inputs[0]); // your sun points
+            game.MyScore = int.Parse(inputs[1]); // your current score
             inputs = ConsoleReadLine().Split(' ');
-            game.opponentSun = int.Parse(inputs[0]); // opponent's sun points
-            game.opponentScore = int.Parse(inputs[1]); // opponent's score
-            game.opponentIsWaiting = inputs[2] != "0"; // whether your opponent is asleep until the next day
+            game.OpponentSun = int.Parse(inputs[0]); // opponent's sun points
+            game.OpponentScore = int.Parse(inputs[1]); // opponent's score
+            game.OpponentIsWaiting = inputs[2] != "0"; // whether your opponent is asleep until the next day
 
             game.Trees.Clear();
             int numberOfTrees = int.Parse(ConsoleReadLine()); // the current amount of trees
