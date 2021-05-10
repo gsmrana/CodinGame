@@ -5,6 +5,8 @@ using System.Collections.Generic;
 
 class Game
 {
+    #region Properties
+
     public int Day { get; set; }
     public int Nutrients { get; set; }
     public int MySun { get; set; }
@@ -17,6 +19,8 @@ class Game
     public List<Tree> Trees { get; set; }
     public List<Action> PossibleActions { get; set; }
 
+    public int SunDirection { get => Day % 6; }
+
     public bool InputDataLogEnable { get; set; }
     public bool ExtraInputLineSkipEnable { get; set; }
 
@@ -27,14 +31,23 @@ class Game
         PossibleActions = new List<Action>();
     }
 
+    #endregion
+
+    #region Game AI Logic
+
     public Action GetNextAction()
     {
-        // ToDo : AI algorithm starts from here
-        var action = PossibleActions
-            .Where(a => a.Type == Action.COMPLETE)
-            .OrderBy(a => a.TargetCellIdx)
-            .FirstOrDefault();
-        if (action != null) return action;
+        Action action;
+
+        if (Trees.Count(t => t.IsMine && t.Size >= 3) >= 6 ||
+            Day >= 19)
+        {
+            action = PossibleActions
+                .Where(a => a.Type == Action.COMPLETE)
+                .OrderBy(a => a.TargetCellIdx)
+                .FirstOrDefault();
+            if (action != null) return action;
+        }
 
         action = PossibleActions
             .Where(a => a.Type == Action.GROW)
@@ -44,13 +57,15 @@ class Game
 
         action = PossibleActions
             .Where(a => a.Type == Action.SEED)
-            .OrderBy(a => a.SourceCellIdx)
             .OrderBy(a => a.TargetCellIdx)
+            .OrderBy(a => a.SourceCellIdx)            
             .FirstOrDefault();
         if (action != null) return action;
 
         return new Action(Action.WAIT);
     }
+
+    #endregion
 }
 
 class Cell
@@ -225,7 +240,10 @@ class Player
             }
 
             Action action = game.GetNextAction();
-            Console.WriteLine(action);
+            //Console.WriteLine(action);
+
+            // On screen command display 
+            Console.WriteLine("{0} {0}", action);
         }
     }
 }
