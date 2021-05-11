@@ -21,6 +21,8 @@ class Game
 
     public int SunDirection { get => Day % 6; }
 
+    public int InputLineNumber { get; set; }
+    public int InputTurnCount { get; set; }
     public bool InputDataLogEnable { get; set; }
     public bool ExtraInputLineSkipEnable { get; set; }
 
@@ -39,30 +41,83 @@ class Game
     {
         Action action;
 
-        if (Trees.Count(t => t.IsMine && t.Size >= 3) >= 6 ||
-            Day >= 19)
+        // 1. Try to complete
+        if (Day > 20 ||
+            Trees.Count(t => t.IsMine && t.Size == 3) > 5 ||
+            !PossibleActions.Any(a => a.Type == Action.GROW || a.Type == Action.SEED))
         {
             action = PossibleActions
                 .Where(a => a.Type == Action.COMPLETE)
                 .OrderBy(a => a.TargetCellIdx)
                 .FirstOrDefault();
-            if (action != null) return action;
+            if (action != null)
+                return action;
         }
 
-        action = PossibleActions
+        // 2. Try to grow
+        var growactions = PossibleActions
             .Where(a => a.Type == Action.GROW)
-            .OrderBy(a => a.TargetCellIdx)
-            .FirstOrDefault();
-        if (action != null) return action;
+            .OrderBy(a => a.TargetCellIdx);
 
-        action = PossibleActions
+        foreach (var item in growactions)
+        {
+            var tree = Trees.First(t => t.CellIndex == item.TargetCellIdx);
+            item.ExecFactor = tree.Size;
+        }
+
+        var gsactions = growactions.OrderByDescending(a => a.ExecFactor);
+        action = gsactions.FirstOrDefault();
+        if (action != null)
+            return action;
+
+        // 3. Try to seed
+        var seedactions = PossibleActions
             .Where(a => a.Type == Action.SEED)
             .OrderBy(a => a.TargetCellIdx)
-            .OrderBy(a => a.SourceCellIdx)            
-            .FirstOrDefault();
-        if (action != null) return action;
+            .OrderBy(a => a.SourceCellIdx);
 
+        foreach (var seedaction in seedactions)
+        {
+            var noneighbour = true;
+            foreach (var tree in Trees)
+            {
+                var cell = Board.First(c => c.Index == tree.CellIndex);
+                if (cell.Neighbours.Contains(seedaction.TargetCellIdx))
+                {
+                    noneighbour = false;
+                    break;
+                }
+            }
+
+            if (noneighbour)
+            {
+                action = seedaction;
+                return action;
+            }
+        }
+
+        action = seedactions.FirstOrDefault();
+        if (action != null)
+            return action;
+
+        // 4. Nothing to do, wait for next day
         return new Action(Action.WAIT);
+    }
+
+    public int GetGrowCost(Tree tree)
+    {
+        var targetTreeCount = Trees.Count(t => t.Size == (tree.Size + 1));
+        switch (tree.Size)
+        {
+            case 0: //seed
+                return (1 + targetTreeCount);
+            case 1:
+                return (3 + targetTreeCount);
+            case 2:
+                return (7 + targetTreeCount);
+            default:
+                throw new Exception("Invalid Tree size!");
+        }
     }
 
     #endregion
@@ -125,6 +180,8 @@ class Action
     public int TargetCellIdx { get; set; }
     public int SourceCellIdx { get; set; }
 
+    public int ExecFactor { get; set; }
+
     public Action(string type, int sourceCellIdx, int targetCellIdx)
     {
         this.Type = type;
@@ -150,7 +207,6 @@ class Action
     }
 }
 
-
 class Player
 {
     static readonly Game game = new Game();
@@ -160,10 +216,11 @@ class Player
         string line = Console.ReadLine();
         if (game.InputDataLogEnable)
             Console.Error.WriteLine(line);
+        game.InputLineNumber++;
         return line;
     }
 
-    static string SkipExtraLogLines(string line)
+    static string DetectExtraLogLines(string line)
     {
         // Standard Error Stream:
         if (line.StartsWith("Standard"))
@@ -174,12 +231,19 @@ class Player
         return line;
     }
 
-    static void IgnoreExtraLines()
+    static void SkipExtraLinesUptoNextTurn()
     {
         if (game.ExtraInputLineSkipEnable)
         {
-            ConsoleReadLine();
-            ConsoleReadLine();
+            int skipcount = 0;
+            while (true)
+            {
+                var line = ConsoleReadLine();
+                if (line.StartsWith("Standard"))
+                    break;
+                if (++skipcount > 12)
+                    throw new Exception("Extra line skip count is too high!");
+            }
         }
     }
 
@@ -189,7 +253,7 @@ class Player
         //game.InputDataLogEnable = true;
 
         string[] inputs;
-        int numberOfCells = int.Parse(SkipExtraLogLines(ConsoleReadLine())); // 37
+        int numberOfCells = int.Parse(DetectExtraLogLines(ConsoleReadLine())); // 37
         for (int i = 0; i < numberOfCells; i++)
         {
             inputs = ConsoleReadLine().Split(' ');
@@ -208,8 +272,8 @@ class Player
         // game loop
         while (true)
         {
-            IgnoreExtraLines();
-            game.Day = int.Parse(SkipExtraLogLines(ConsoleReadLine())); // the game lasts 24 days: 0-23
+            SkipExtraLinesUptoNextTurn();
+            game.Day = int.Parse(ConsoleReadLine()); // the game lasts 24 days: 0-23
             game.Nutrients = int.Parse(ConsoleReadLine()); // the base score you gain from the next COMPLETE action
             inputs = ConsoleReadLine().Split(' ');
             game.MySun = int.Parse(inputs[0]); // your sun points
@@ -241,9 +305,8 @@ class Player
 
             Action action = game.GetNextAction();
             //Console.WriteLine(action);
-
-            // On screen command display 
-            Console.WriteLine("{0} {0}", action);
+            Console.WriteLine("{0} {0}", action); // Display
+            game.InputTurnCount++;
         }
     }
 }
