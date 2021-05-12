@@ -41,9 +41,13 @@ class Game
     {
         Action action;
 
+        // Wait a while to increase sun points
+        if(Day < 1)
+            return new Action(Action.WAIT);
+
         // 1. Try to complete
         if (Day > 20 ||
-            Trees.Count(t => t.IsMine && t.Size == 3) > 5 ||
+            Trees.Count(t => t.IsMine && t.Size == 3) > 3 ||
             !PossibleActions.Any(a => a.Type == Action.GROW || a.Type == Action.SEED))
         {
             action = PossibleActions
@@ -73,13 +77,12 @@ class Game
         // 3. Try to seed
         var seedactions = PossibleActions
             .Where(a => a.Type == Action.SEED)
-            .OrderBy(a => a.TargetCellIdx)
-            .OrderBy(a => a.SourceCellIdx);
+            .OrderBy(a => a.TargetCellIdx);
 
         foreach (var seedaction in seedactions)
         {
             var noneighbour = true;
-            foreach (var tree in Trees)
+            foreach (var tree in Trees.Where(t => t.IsMine))
             {
                 var cell = Board.First(c => c.Index == tree.CellIndex);
                 if (cell.Neighbours.Contains(seedaction.TargetCellIdx))
@@ -96,9 +99,12 @@ class Game
             }
         }
 
-        action = seedactions.FirstOrDefault();
-        if (action != null)
-            return action;
+        if (!Trees.Any(t => t.IsMine && t.Size == 1))
+        {
+            action = seedactions.FirstOrDefault();
+            if (action != null)
+                return action;
+        }
 
         // 4. Nothing to do, wait for next day
         return new Action(Action.WAIT);
@@ -250,7 +256,7 @@ class Player
     static void Main(string[] args)
     {
         // Enable this to log the game inputs
-        //game.InputDataLogEnable = true;
+        game.InputDataLogEnable = true;
 
         string[] inputs;
         int numberOfCells = int.Parse(DetectExtraLogLines(ConsoleReadLine())); // 37
