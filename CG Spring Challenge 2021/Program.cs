@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 
 class Game
 {
@@ -23,7 +24,9 @@ class Game
 
     public int InputLineNumber { get; set; }
     public int InputTurnCount { get; set; }
+    public bool InputFromFile { get; set; }
     public bool InputDataLogEnable { get; set; }
+    public bool OutputDebugEnable { get; set; }
     public bool ExtraInputLineSkipEnable { get; set; }
 
     public Game()
@@ -42,7 +45,7 @@ class Game
         Action action;
 
         // Wait a while to increase sun points
-        if(Day < 1)
+        if (Day < 1)
             return new Action(Action.WAIT);
 
         // 1. Try to complete
@@ -63,16 +66,19 @@ class Game
             .Where(a => a.Type == Action.GROW)
             .OrderBy(a => a.TargetCellIdx);
 
-        foreach (var item in growactions)
-        {
-            var tree = Trees.First(t => t.CellIndex == item.TargetCellIdx);
-            item.ExecFactor = tree.Size;
-        }
+        var gjaction = growactions.Join(Trees,
+            ga => ga.TargetCellIdx,
+            tr => tr.CellIndex,
+            (action, tree) => new
+            {
+                Gaction = action,
+                TreeSize = tree.Size
+            })
+            .OrderByDescending(gj => gj.TreeSize)
+            .FirstOrDefault();
 
-        var gsactions = growactions.OrderByDescending(a => a.ExecFactor);
-        action = gsactions.FirstOrDefault();
-        if (action != null)
-            return action;
+        if (gjaction != null)
+            return gjaction.Gaction;
 
         // 3. Try to seed
         var seedactions = PossibleActions
@@ -94,8 +100,7 @@ class Game
 
             if (noneighbour)
             {
-                action = seedaction;
-                return action;
+                return seedaction;
             }
         }
 
@@ -108,22 +113,6 @@ class Game
 
         // 4. Nothing to do, wait for next day
         return new Action(Action.WAIT);
-    }
-
-    public int GetGrowCost(Tree tree)
-    {
-        var targetTreeCount = Trees.Count(t => t.Size == (tree.Size + 1));
-        switch (tree.Size)
-        {
-            case 0: //seed
-                return (1 + targetTreeCount);
-            case 1:
-                return (3 + targetTreeCount);
-            case 2:
-                return (7 + targetTreeCount);
-            default:
-                throw new Exception("Invalid Tree size!");
-        }
     }
 
     #endregion
@@ -186,8 +175,6 @@ class Action
     public int TargetCellIdx { get; set; }
     public int SourceCellIdx { get; set; }
 
-    public int ExecFactor { get; set; }
-
     public Action(string type, int sourceCellIdx, int targetCellIdx)
     {
         this.Type = type;
@@ -217,11 +204,26 @@ class Player
 {
     static readonly Game game = new Game();
 
+    static StreamReader InputFileStream;
+    static readonly string InputFileName = "InputData.txt";
+
     static string ConsoleReadLine()
     {
-        string line = Console.ReadLine();
+        string line;
+        if (game.InputFromFile)
+        {
+            line = InputFileStream.ReadLine();
+            if (string.IsNullOrEmpty(line))
+            {
+                Console.WriteLine("*** End of input file data! ***");
+                Console.ReadKey();
+            }
+        }
+        else line = Console.ReadLine();
+
         if (game.InputDataLogEnable)
             Console.Error.WriteLine(line);
+
         game.InputLineNumber++;
         return line;
     }
@@ -255,8 +257,16 @@ class Player
 
     static void Main(string[] args)
     {
-        // Enable this to log the game inputs
+        //game.InputFromFile = true;       
         game.InputDataLogEnable = true;
+        game.OutputDebugEnable = true;
+
+        if (game.InputFromFile)
+        {
+            if (File.Exists(InputFileName))
+                InputFileStream = new StreamReader(InputFileName);
+            else throw new Exception(InputFileName + " - Input file not found! ");
+        }
 
         string[] inputs;
         int numberOfCells = int.Parse(DetectExtraLogLines(ConsoleReadLine())); // 37
@@ -310,8 +320,7 @@ class Player
             }
 
             Action action = game.GetNextAction();
-            //Console.WriteLine(action);
-            Console.WriteLine("{0} {0}", action); // Display
+            Console.WriteLine("{0}{1}", action, game.OutputDebugEnable ? " " + action : "");
             game.InputTurnCount++;
         }
     }

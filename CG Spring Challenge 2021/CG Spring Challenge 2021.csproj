@@ -6,4 +6,10 @@
     <RootNamespace>CG_Spring_Challenge_2021</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Update="InputData.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
