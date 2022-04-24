@@ -77,12 +77,37 @@ while True:
         else:
             assert False
 
+     # sort threats by distance from base asc
     mythreats = []
-    for m in monsters:
-        if m.threat_for == THREAT_FOR_MINE:
-            dist_from_base = math.hypot(mybase_x - m.x, mybase_y - m.y)
-            mythreats.append((dist_from_base, m))
-    mythreats.sort()  # sort by distance from base asc
+    for monster in monsters:
+        if monster.threat_for == THREAT_FOR_MINE:
+            dist_from_base = math.hypot(
+                mybase_x - monster.x, mybase_y - monster.y)
+            mythreats.append((dist_from_base, monster))
+    mythreats.sort()
+
+    # sort threats by distance from heros asc
+    nearest_threats = []
+    for threat in mythreats:
+        dist_from_heros = []
+        for i in range(heroes_per_player):
+            target = threat[1]
+            target_dist = math.hypot(
+                my_heroes[i].x - target.x, my_heroes[i].y - target.y)
+            dist_from_heros.append((target_dist, target))
+        dist_from_heros.sort()
+
+        if len(mythreats) == 1:
+            for i in range(heroes_per_player):
+                nearest_threats.append(dist_from_heros[i])
+        elif len(mythreats) == 2:
+            for i in range(heroes_per_player - 1):
+                nearest_threats.append(dist_from_heros[i])
+        else:
+            nearest_threats.append(dist_from_heros[0])
+
+        if len(nearest_threats) >= heroes_per_player:
+            break
 
     wind_count = 0
     control_count = 0
@@ -94,16 +119,16 @@ while True:
                 f'MOVE {myheros_tent[i][0]} {myheros_tent[i][1]}')
             continue
 
-        if mythreats:
-            target = mythreats[i % len(mythreats)][1]
+        if nearest_threats:
+            target = nearest_threats[i][1]
             target_dist = math.hypot(
                 my_heroes[i].x - target.x, my_heroes[i].y - target.y)
-            if wind_count == 0 and target_dist < 1280:
+            if wind_count == 0 and my_mana >= 10 and target_dist < 1280:
                 outputs[i] = (f'SPELL WIND {opbase_x} {opbase_y}')
                 wind_count += 1
-            # elif control_count == 0 and target_dist >= 1280 and target_dist < 2200:
+            # elif control_count == 0 and target.is_controlled != 1 and target_dist >= 1280 and target_dist < 2200:
             #     outputs[i] = (
-            #         f'SPELL CONTROL {target.id} {target.x} {target.y}')
+            #         f'SPELL CONTROL {target.id} {opbase_x} {opbase_y}')
             #     control_count += 1
             # elif shield_count == 0 and target_dist >= 1280 and target_dist < 2200:
             #     outputs[i] = (f'SPELL SHIELD {target.id}')
