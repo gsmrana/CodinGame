@@ -30,9 +30,9 @@ heroes_per_player = int(input())  # Always 3
 opbase_x = BOARD_SIZE_X
 opbase_y = BOARD_SIZE_Y
 myheros_tent = [
-    [100, 50],
-    [100, 100],
-    [100, 150]
+    [5500, 1500],
+    [5000, 3500],
+    [2500, 4800]
 ]
 
 if mybase_x != 0:
