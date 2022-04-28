@@ -30,9 +30,9 @@ heroes_per_player = int(input())  # Always 3
 opbase_x = BOARD_SIZE_X
 opbase_y = BOARD_SIZE_Y
 myheros_tent = [
-    [5500, 1500],
-    [5000, 3500],
-    [2500, 4800]
+    [5795, 1552],
+    [4242, 4242],
+    [1552, 5795]
 ]
 
 if mybase_x != 0:
@@ -78,13 +78,25 @@ while True:
             assert False
 
      # sort threats by distance from base asc
+    manasource = []
     mythreats = []
+    opthreats = []
     for monster in monsters:
-        if monster.threat_for == THREAT_FOR_MINE:
-            dist_from_base = math.hypot(
+        if monster.threat_for == THREAT_FOR_NONE:
+            dist_from_mybase = math.hypot(
                 mybase_x - monster.x, mybase_y - monster.y)
-            mythreats.append((dist_from_base, monster))
+            manasource.append((dist_from_mybase, monster))
+        elif monster.threat_for == THREAT_FOR_MINE:
+            dist_from_mybase = math.hypot(
+                mybase_x - monster.x, mybase_y - monster.y)
+            mythreats.append((dist_from_mybase, monster))
+        elif monster.threat_for == THREAT_FOR_OPNT:
+            dist_from_opbase = math.hypot(
+                opbase_x - monster.x, opbase_y - monster.y)
+            opthreats.append((dist_from_opbase, monster))
+    manasource.sort()
     mythreats.sort()
+    opthreats.sort()
 
     # sort threats by distance from heros asc
     nearest_threats = []
@@ -96,7 +108,6 @@ while True:
                 my_heroes[i].x - target.x, my_heroes[i].y - target.y)
             dist_from_heros.append((target_dist, target))
         dist_from_heros.sort()
-
         if len(mythreats) == 1:
             for i in range(heroes_per_player):
                 nearest_threats.append(dist_from_heros[i])
@@ -105,7 +116,6 @@ while True:
                 nearest_threats.append(dist_from_heros[i])
         else:
             nearest_threats.append(dist_from_heros[0])
-
         if len(nearest_threats) >= heroes_per_player:
             break
 
@@ -117,16 +127,16 @@ while True:
         if game_turn < 5 or len(mythreats) == 0:
             outputs[i] = (
                 f'MOVE {myheros_tent[i][0]} {myheros_tent[i][1]}')
-            continue
-
-        if nearest_threats:
+        elif nearest_threats:
             target = nearest_threats[i][1]
             target_dist = math.hypot(
                 my_heroes[i].x - target.x, my_heroes[i].y - target.y)
-            if wind_count == 0 and my_mana >= 10 and target_dist < 1280:
+            dist_from_base = math.hypot(
+                mybase_x - target.x, mybase_y - target.y)
+            if dist_from_base < 6000 and wind_count == 0 and my_mana >= 10 and target_dist < 1280:
                 outputs[i] = (f'SPELL WIND {opbase_x} {opbase_y}')
                 wind_count += 1
-            # elif control_count == 0 and target.is_controlled != 1 and target_dist >= 1280 and target_dist < 2200:
+            # elif dist_from_base >= 6000 and control_count == 0 and target.is_controlled != 1 and target_dist < 2200:
             #     outputs[i] = (
             #         f'SPELL CONTROL {target.id} {opbase_x} {opbase_y}')
             #     control_count += 1
