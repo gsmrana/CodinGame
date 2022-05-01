@@ -1,4 +1,3 @@
-import sys
 import math
 from collections import namedtuple
 
@@ -31,7 +30,7 @@ opbase_x = BOARD_SIZE_X
 opbase_y = BOARD_SIZE_Y
 myheros_tent = [
     [5795, 1552],
-    [4242, 4242],
+    [7000, 4800],
     [1552, 5795]
 ]
 
@@ -78,14 +77,14 @@ while True:
             assert False
 
      # sort threats by distance from base asc
-    manasource = []
+    manasources = []
     mythreats = []
     opthreats = []
     for monster in monsters:
         if monster.threat_for == THREAT_FOR_NONE:
             dist_from_mybase = math.hypot(
                 mybase_x - monster.x, mybase_y - monster.y)
-            manasource.append((dist_from_mybase, monster))
+            manasources.append((dist_from_mybase, monster))
         elif monster.threat_for == THREAT_FOR_MINE:
             dist_from_mybase = math.hypot(
                 mybase_x - monster.x, mybase_y - monster.y)
@@ -94,11 +93,11 @@ while True:
             dist_from_opbase = math.hypot(
                 opbase_x - monster.x, opbase_y - monster.y)
             opthreats.append((dist_from_opbase, monster))
-    manasource.sort()
+    manasources.sort()
     mythreats.sort()
     opthreats.sort()
 
-    # sort threats by distance from heros asc
+    # sort threats by distance from myheros asc
     nearest_threats = []
     for threat in mythreats:
         dist_from_heros = []
@@ -119,21 +118,63 @@ while True:
         if len(nearest_threats) >= heroes_per_player:
             break
 
+    # sort opheros by distance from mybase asc
+    nearest_opheros = []
+    for ophero in opp_heroes:
+        dist_from_mybase = math.hypot(mybase_x - ophero.x, mybase_y - ophero.y)
+        nearest_opheros.append((dist_from_mybase, ophero))
+    nearest_opheros.sort()
+
+    ophero_to_attack = []
+    if nearest_opheros:
+        for i in range(heroes_per_player):
+            target = nearest_opheros[0][1]
+            target_dist = math.hypot(
+                my_heroes[i].x - target.x, my_heroes[i].y - target.y)
+            if target_dist < 2200:
+                ophero_to_attack.append((target_dist, i, target))
+            else:
+                ophero_to_attack.append((target_dist, -1, None))
+        ophero_to_attack.sort()
+
+    # sort manasources by distance from myheros asc
+    nearest_manasource = []
+    for manasource in manasources:
+        dist_from_myheros = []
+        for i in range(heroes_per_player):
+            target = manasource[1]
+            target_dist = math.hypot(
+                my_heroes[i].x - target.x, my_heroes[i].y - target.y)
+            dist_from_myheros.append((target_dist, target))
+        dist_from_myheros.sort()
+        nearest_manasource.append(dist_from_myheros[0])
+        if len(nearest_manasource) >= heroes_per_player:
+            break
+
     wind_count = 0
     control_count = 0
     shield_count = 0
+    opheros_action_count = 0
     outputs = ['WAIT', 'WAIT', 'WAIT']
     for i in range(heroes_per_player):
-        if game_turn < 5 or len(mythreats) == 0:
+        if game_turn < 5 or len(nearest_threats) == 0:
             outputs[i] = (
                 f'MOVE {myheros_tent[i][0]} {myheros_tent[i][1]}')
+        elif game_turn > 5 and game_turn < 50 and i < len(nearest_manasource) and nearest_manasource[i][1] != None and len(nearest_threats) == 0:
+            target = nearest_manasource[i][1]
+            outputs[i] = (f'MOVE {target.x} {target.y}')
+        elif ophero_to_attack and opheros_action_count < 1 and game_turn > 100 and my_mana >= 10 and ophero_to_attack[0][1] == i:
+            target = ophero_to_attack[0][2]
+            outputs[i] = (
+                f'SPELL CONTROL {target.id} {opbase_x} {opbase_y}')
+            opheros_action_count += 1
         elif nearest_threats:
             target = nearest_threats[i][1]
             target_dist = math.hypot(
                 my_heroes[i].x - target.x, my_heroes[i].y - target.y)
             dist_from_base = math.hypot(
                 mybase_x - target.x, mybase_y - target.y)
-            if dist_from_base < 6000 and wind_count == 0 and my_mana >= 10 and target_dist < 1280:
+            if dist_from_base < 6000 and wind_count == 0 and my_mana >= 10 and target_dist < 1280 and target.shield_life == 0:
                 outputs[i] = (f'SPELL WIND {opbase_x} {opbase_y}')
                 wind_count += 1
             # elif dist_from_base >= 6000 and control_count == 0 and target.is_controlled != 1 and target_dist < 2200:
