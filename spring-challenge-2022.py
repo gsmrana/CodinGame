@@ -1,5 +1,7 @@
+import sys
 import math
 from collections import namedtuple
+from telnetlib import NOP
 
 # entity types
 ETYPE_MONSTER = 0
@@ -16,7 +18,8 @@ BOARD_SIZE_X = 17630
 BOARD_SIZE_Y = 9000
 
 Entity = namedtuple('Entity', [
-    'id', 'type', 'x', 'y', 'shield_life', 'is_controlled', 'health', 'vx', 'vy', 'near_base', 'threat_for'
+    'id', 'type', 'x', 'y', 'shield_life', 'is_controlled',
+    'health', 'vx', 'vy', 'near_base', 'threat_for'
 ])
 
 # game vars
@@ -51,7 +54,7 @@ while True:
 
     monsters = []
     my_heroes = []
-    opp_heroes = []
+    op_heroes = []
     for i in range(entity_count):
         _id, _type, x, y, shield_life, is_controlled, health, vx, vy, near_base, threat_for = [
             int(j) for j in input().split()]
@@ -64,7 +67,7 @@ while True:
             health,         # health: Remaining health of this monster
             vx, vy,         # vx,vy: Trajectory of this monster
             near_base,      # near_base: 0=monster with no target yet, 1=monster targeting a base
-            threat_for      # threat_for: Given this monster's trajectory, is it a threat to 1=your base, 2=your opponent's base, 0=neither
+            threat_for     # threat_for: Given this monster's trajectory, is it a threat to 1=your base, 2=your opponent's base, 0=neither
         )
 
         if _type == ETYPE_MONSTER:
@@ -72,120 +75,89 @@ while True:
         elif _type == ETYPE_MY_HERO:
             my_heroes.append(entity)
         elif _type == ETYPE_OP_HERO:
-            opp_heroes.append(entity)
+            op_heroes.append(entity)
         else:
             assert False
 
-     # sort threats by distance from base asc
-    manasources = []
+     # sort threats by threat level des
     mythreats = []
     opthreats = []
     for monster in monsters:
-        if monster.threat_for == THREAT_FOR_NONE:
-            dist_from_mybase = math.hypot(
-                mybase_x - monster.x, mybase_y - monster.y)
-            manasources.append((dist_from_mybase, monster))
-        elif monster.threat_for == THREAT_FOR_MINE:
-            dist_from_mybase = math.hypot(
-                mybase_x - monster.x, mybase_y - monster.y)
-            mythreats.append((dist_from_mybase, monster))
-        elif monster.threat_for == THREAT_FOR_OPNT:
+        threat_level = 0
+        if monster.threat_for == THREAT_FOR_OPNT:
             dist_from_opbase = math.hypot(
                 opbase_x - monster.x, opbase_y - monster.y)
-            opthreats.append((dist_from_opbase, monster))
-    manasources.sort()
-    mythreats.sort()
-    opthreats.sort()
-
-    # sort threats by distance from myheros asc
-    nearest_threats = []
-    for threat in mythreats:
-        dist_from_heros = []
-        for i in range(heroes_per_player):
-            target = threat[1]
-            target_dist = math.hypot(
-                my_heroes[i].x - target.x, my_heroes[i].y - target.y)
-            dist_from_heros.append((target_dist, target))
-        dist_from_heros.sort()
-        if len(mythreats) == 1:
-            for i in range(heroes_per_player):
-                nearest_threats.append(dist_from_heros[i])
-        elif len(mythreats) == 2:
-            for i in range(heroes_per_player - 1):
-                nearest_threats.append(dist_from_heros[i])
+            threat_level += 500 * (20000 / (dist_from_mybase + 1))
+            opthreats.append((threat_level, monster))
         else:
-            nearest_threats.append(dist_from_heros[0])
-        if len(nearest_threats) >= heroes_per_player:
-            break
+            if monster.threat_for == THREAT_FOR_MINE:
+                threat_level += 1000
+            dist_from_mybase = math.hypot(
+                mybase_x - monster.x, mybase_y - monster.y)
+            if dist_from_mybase > 9000:
+                continue
+            threat_level += 500 * (20000 / (dist_from_mybase + 1))
+            threat_level += 100 * (monster.health / 30)
+            mythreats.append((threat_level, monster))
 
-    # sort opheros by distance from mybase asc
-    nearest_opheros = []
-    for ophero in opp_heroes:
-        dist_from_mybase = math.hypot(mybase_x - ophero.x, mybase_y - ophero.y)
-        nearest_opheros.append((dist_from_mybase, ophero))
-    nearest_opheros.sort()
+    for ophero in op_heroes:
+        threat_level = 1000
+        dist_from_mybase = math.hypot(
+            mybase_x - ophero.x, mybase_y - ophero.y)
+        if game_turn > 100:
+            threat_level += 2005
+        if dist_from_mybase < 1000:
+            threat_level += 500 * (20000 / (dist_from_mybase + 1))
+        mythreats.append((threat_level, ophero))
 
-    ophero_to_attack = []
-    if nearest_opheros:
-        for i in range(heroes_per_player):
-            target = nearest_opheros[0][1]
-            target_dist = math.hypot(
-                my_heroes[i].x - target.x, my_heroes[i].y - target.y)
-            if target_dist < 2200:
-                ophero_to_attack.append((target_dist, i, target))
-            else:
-                ophero_to_attack.append((target_dist, -1, None))
-        ophero_to_attack.sort()
+    mythreats.sort(reverse=True)
+    opthreats.sort(reverse=True)
+    print(mythreats, file=sys.stderr, flush=True)
 
-    # sort manasources by distance from myheros asc
-    nearest_manasource = []
-    for manasource in manasources:
+    # find nearest heros
+    threat_index = 0
+    nearest_threats = [None, None, None]
+    for threat in mythreats:
         dist_from_myheros = []
         for i in range(heroes_per_player):
-            target = manasource[1]
-            target_dist = math.hypot(
-                my_heroes[i].x - target.x, my_heroes[i].y - target.y)
-            dist_from_myheros.append((target_dist, target))
+            if nearest_threats[i] != None:
+                continue
+            if my_heroes[i].is_controlled == 1:
+                dist_from_myheros.append((20000, i, None))
+            else:
+                target = threat[1]
+                hero_dist = math.hypot(
+                    my_heroes[i].x - target.x, my_heroes[i].y - target.y)
+                dist_from_myheros.append((hero_dist, i, threat))
         dist_from_myheros.sort()
-        nearest_manasource.append(dist_from_myheros[0])
-        if len(nearest_manasource) >= heroes_per_player:
+        nearest_threats[dist_from_myheros[0][1]] = dist_from_myheros[0][2]
+        threat_index += 1
+        if threat_index >= heroes_per_player:
             break
+    print(nearest_threats, file=sys.stderr, flush=True)
 
     wind_count = 0
     control_count = 0
     shield_count = 0
-    opheros_action_count = 0
     outputs = ['WAIT', 'WAIT', 'WAIT']
     for i in range(heroes_per_player):
-        if game_turn < 5 or len(nearest_threats) == 0:
-            outputs[i] = (
-                f'MOVE {myheros_tent[i][0]} {myheros_tent[i][1]}')
-        elif game_turn > 5 and game_turn < 50 and i < len(nearest_manasource) and nearest_manasource[i][1] != None and len(nearest_threats) == 0:
-            target = nearest_manasource[i][1]
-            outputs[i] = (f'MOVE {target.x} {target.y}')
-        elif ophero_to_attack and opheros_action_count < 1 and game_turn > 100 and my_mana >= 10 and ophero_to_attack[0][1] == i:
-            target = ophero_to_attack[0][2]
-            outputs[i] = (
-                f'SPELL CONTROL {target.id} {opbase_x} {opbase_y}')
-            opheros_action_count += 1
-        elif nearest_threats:
+        if nearest_threats[i] != None:
+            threat_level = nearest_threats[i][0]
             target = nearest_threats[i][1]
             target_dist = math.hypot(
                 my_heroes[i].x - target.x, my_heroes[i].y - target.y)
-            dist_from_base = math.hypot(
-                mybase_x - target.x, mybase_y - target.y)
-            if dist_from_base < 6000 and wind_count == 0 and my_mana >= 10 and target_dist < 1280 and target.shield_life == 0:
-                outputs[i] = (f'SPELL WIND {opbase_x} {opbase_y}')
+            if target.type == ETYPE_OP_HERO and threat_level > 3000 and control_count <= 0 and my_mana >= 10 and target_dist < 2200:
+                outputs[i] = (
+                    f'SPELL CONTROL {target.id} {opbase_x} {opbase_y} {target.id}')
+                control_count += 1
+            elif threat_level > 3000 and wind_count <= 0 and my_mana >= 10 and target_dist < 1280 and target.shield_life == 0:
+                outputs[i] = (f'SPELL WIND {opbase_x} {opbase_y} {target.id}')
                 wind_count += 1
-            # elif dist_from_base >= 6000 and control_count == 0 and target.is_controlled != 1 and target_dist < 2200:
-            #     outputs[i] = (
-            #         f'SPELL CONTROL {target.id} {opbase_x} {opbase_y}')
-            #     control_count += 1
-            # elif shield_count == 0 and target_dist >= 1280 and target_dist < 2200:
-            #     outputs[i] = (f'SPELL SHIELD {target.id}')
-            #     shield_count += 1
             else:
-                outputs[i] = (f'MOVE {target.x} {target.y}')
+                outputs[i] = (f'MOVE {target.x} {target.y} {target.id}')
+        else:
+            outputs[i] = (
+                f'MOVE {myheros_tent[i][0]} {myheros_tent[i][1]} Tent')
     game_turn += 1
 
     for i in range(heroes_per_player):
