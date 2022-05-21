@@ -1,7 +1,6 @@
 import sys
 import math
 from collections import namedtuple
-from telnetlib import NOP
 
 # entity types
 ETYPE_MONSTER = 0
